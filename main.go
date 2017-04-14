@@ -14,7 +14,7 @@
 
 package main
 
-import "github.com/quantamhd/guprint/cmd"
+import "github.com/quantamhd/gu/cmd"
 
 func main() {
 	cmd.Execute()
