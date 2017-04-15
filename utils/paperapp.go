@@ -35,6 +35,14 @@ type PaperCutPrinter struct {
 	location string
 }
 
+type PaperCutPrintJob struct {
+	printer          *PaperCutPrinter
+	copies           int
+	fileLocationPath string
+	uploadID         int
+	jobID            string
+}
+
 func (p PaperCutCredentials) GetSessionID() string {
 	return p.sessionID
 }
@@ -58,15 +66,7 @@ func GetPaperCutPrinters(credentials *PaperCutCredentials) []*PaperCutPrinter {
 
 	req, _ := http.NewRequest("GET", printerListURL, nil)
 
-	req.Header.Add("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8")
-	req.Header.Add("Accept-Encoding", "")
-	req.Header.Add("Accept-Language", "en-US,en;q=0.8")
-	req.Header.Add("Connection", "keep-alive")
-	req.Header.Add("Cookie", "org.apache.tapestry.locale=en; JSESSIONID="+credentials.GetSessionID())
-	req.Header.Add("Host", "paper-app.gonzaga.edu:9192")
-	req.Header.Add("Referer", "https://paper-app.gonzaga.edu:9192/app?service=page/UserWebPrint")
-	req.Header.Add("User-Agent", "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/57.0.2987.133 Safari/537.36")
-
+	addGetHeaders(req, credentials.sessionID)
 	resp, err := netClient.Do(req)
 
 	if err != nil {
@@ -77,6 +77,11 @@ func GetPaperCutPrinters(credentials *PaperCutCredentials) []*PaperCutPrinter {
 	defer resp.Body.Close()
 
 	return getPrinterList(resp)
+}
+
+func CreatePrintJob(printer *PaperCutPrinter, copies int, filePath string) {
+	printJob := PaperCutPrintJob{printer, copies, filePath, -1, ""}
+
 }
 
 func getPrinterList(httpResponse *http.Response) []*PaperCutPrinter {
@@ -140,19 +145,7 @@ func login(credentials *PaperCutCredentials) {
 
 	req, _ := http.NewRequest("POST", loginURL, bytes.NewBufferString(form.Encode()))
 
-	req.Header.Add("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8")
-	req.Header.Add("Accept-Encoding", "gzip, deflate, br")
-	req.Header.Add("Accept-Language", "en-US,en;q=0.8")
-	req.Header.Add("Cache-Control", "max-age=0")
-	req.Header.Add("Connection", "keep-alive")
-	req.Header.Add("Content-Length", strconv.Itoa(len(form.Encode())))
-	req.Header.Add("Cookie", "org.apache.tapestry.locale=en;JSESSIONID="+jessionid)
-	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
-	req.Header.Add("Host", "paper-app.gonzaga.edu:9192")
-	req.Header.Add("Origin", "https://paper-app.gonzaga.edu:9192")
-	req.Header.Add("Referer", "https://paper-app.gonzaga.edu:9192/user")
-	req.Header.Add("User-Agent", "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/57.0.2987.133 Safari/537.36")
-
+	addPostHeaders(req, form, jessionid)
 	resp, err := netClient.Do(req)
 
 	if err != nil {
@@ -167,6 +160,33 @@ func login(credentials *PaperCutCredentials) {
 		credentials.isLoggedIn = true
 		credentials.sessionID = jessionid
 	}
+}
+
+func addGetHeaders(req *http.Request, jsessionid string) {
+	req.Header.Add("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8")
+	req.Header.Add("Accept-Encoding", "")
+	req.Header.Add("Accept-Language", "en-US,en;q=0.8")
+	req.Header.Add("Connection", "keep-alive")
+	req.Header.Add("Cookie", "org.apache.tapestry.locale=en; JSESSIONID="+jsessionid)
+	req.Header.Add("Host", "paper-app.gonzaga.edu:9192")
+	req.Header.Add("Referer", "https://paper-app.gonzaga.edu:9192/app?service=page/UserWebPrint")
+	req.Header.Add("User-Agent", "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/57.0.2987.133 Safari/537.36")
+}
+
+func addPostHeaders(req *http.Request, form url.Values, jessionid string) {
+	req.Header.Add("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8")
+	req.Header.Add("Accept-Encoding", "")
+	req.Header.Add("Accept-Language", "en-US,en;q=0.8")
+	req.Header.Add("Cache-Control", "max-age=0")
+	req.Header.Add("Connection", "keep-alive")
+	req.Header.Add("Content-Length", strconv.Itoa(len(form.Encode())))
+	req.Header.Add("Cookie", "org.apache.tapestry.locale=en;JSESSIONID="+jessionid)
+	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Add("Host", "paper-app.gonzaga.edu:9192")
+	req.Header.Add("Origin", "https://paper-app.gonzaga.edu:9192")
+	req.Header.Add("Referer", "https://paper-app.gonzaga.edu:9192/user")
+	req.Header.Add("User-Agent", "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/57.0.2987.133 Safari/537.36")
+
 }
 
 func isLoggedIn(loginResponse *http.Response) bool {
