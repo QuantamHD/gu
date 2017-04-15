@@ -22,14 +22,27 @@ import (
 	"github.com/bgentry/speakeasy"
 	"github.com/quantamhd/gu/utils"
 	"github.com/spf13/cobra"
+	"github.com/olekukonko/tablewriter"
 )
+
+func printTable(printers []*utils.PaperCutPrinter) {
+	table := tablewriter.NewWriter(os.Stdout)
+	table.SetHeader([]string{"ID", "name", "location"})
+	table.SetRowLine(true)
+
+	for _, p := range printers {
+		table.Append(p.ToListStrings())
+	}
+
+	table.Render()
+}
 
 // printCmd represents the print command
 var printCmd = &cobra.Command{
 	Use:   "print <document file>",
 	Short: "Prints your document at the selected location",
 	Long: `This command connects to the Gonzaga Print system and sends your
-document off to the printer. 
+document off to the printer.
 
 Examples
 
@@ -71,7 +84,8 @@ Supported Document Types
 			os.Exit(1)
 		}
 
-		utils.GetPaperCutPrinters(credentials)
+		printers := utils.GetPaperCutPrinters(credentials)
+		printTable(printers)
 
 	},
 }
