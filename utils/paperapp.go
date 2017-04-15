@@ -3,13 +3,14 @@ package utils
 import (
 	"bytes"
 	"fmt"
+	"log"
 	"net/http"
 	"net/url"
 	"os"
 	"strconv"
 	"time"
 
-	"log"
+	"strings"
 
 	"github.com/PuerkitoBio/goquery"
 )
@@ -28,14 +29,77 @@ type PaperCutCredentials struct {
 	isLoggedIn bool
 }
 
+type PaperCutPrinter struct {
+	value    int
+	name     string
+	location string
+}
+
 func (p PaperCutCredentials) GetSessionID() string {
 	return p.sessionID
+}
+
+func (p PaperCutCredentials) IsLoggedIn() bool {
+	return p.isLoggedIn
 }
 
 func CreatePaperCutCredentials(username string, password string) *PaperCutCredentials {
 	credentials := PaperCutCredentials{username, password, "", false}
 	login(&credentials)
 	return &credentials
+}
+
+func GetPaperCutPrinters(credentials *PaperCutCredentials) []*PaperCutPrinter {
+	netClient := &http.Client{
+		Timeout: time.Second * 10,
+	}
+
+	printerListURL := baseURL + "/app?service=action/1/UserWebPrint/0/$ActionLink"
+
+	req, _ := http.NewRequest("GET", printerListURL, nil)
+
+	req.Header.Add("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8")
+	req.Header.Add("Accept-Encoding", "")
+	req.Header.Add("Accept-Language", "en-US,en;q=0.8")
+	req.Header.Add("Connection", "keep-alive")
+	req.Header.Add("Cookie", "org.apache.tapestry.locale=en; JSESSIONID="+credentials.GetSessionID())
+	req.Header.Add("Host", "paper-app.gonzaga.edu:9192")
+	req.Header.Add("Referer", "https://paper-app.gonzaga.edu:9192/app?service=page/UserWebPrint")
+	req.Header.Add("User-Agent", "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/57.0.2987.133 Safari/537.36")
+
+	resp, err := netClient.Do(req)
+
+	if err != nil {
+		log.Fatal(err)
+		os.Exit(1)
+	}
+
+	defer resp.Body.Close()
+
+	return getPrinterList(resp)
+}
+
+func getPrinterList(httpResponse *http.Response) []*PaperCutPrinter {
+	var printers []*PaperCutPrinter
+
+	doc, err := goquery.NewDocumentFromResponse(httpResponse)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	doc.Find(".odd, .even").Each(func(i int, s *goquery.Selection) {
+
+		printerName := strings.Replace(s.Find("label").Text(), "\n", "", -1)
+		locationName := strings.Replace(s.Find("td.locationColumnValue").Text(), "\n", "", -1)
+		valueString, _ := s.Find("input").Attr("value")
+		valueInt, _ := strconv.Atoi(valueString)
+
+		structPrinter := PaperCutPrinter{valueInt, printerName, locationName}
+
+		printers = append(printers, &structPrinter)
+	})
+
+	return printers
 }
 
 func intitalConnection() (string, *http.Client) {
@@ -71,7 +135,8 @@ func login(credentials *PaperCutCredentials) {
 		"inputUsername":        {credentials.username},
 		"inputPassword":        {credentials.password},
 		"$PropertySelection$0": {"en"},
-		"$Submit$0":            {"Log in"}}
+		"$Submit$0":            {"Log in"},
+	}
 
 	req, _ := http.NewRequest("POST", loginURL, bytes.NewBufferString(form.Encode()))
 
@@ -97,6 +162,7 @@ func login(credentials *PaperCutCredentials) {
 
 	defer resp.Body.Close()
 
+	//io.Copy(os.Stdout, resp.Body)
 	if isLoggedIn(resp) {
 		credentials.isLoggedIn = true
 		credentials.sessionID = jessionid

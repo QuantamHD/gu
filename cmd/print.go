@@ -17,6 +17,8 @@ package cmd
 import (
 	"fmt"
 
+	"os"
+
 	"github.com/bgentry/speakeasy"
 	"github.com/quantamhd/gu/utils"
 	"github.com/spf13/cobra"
@@ -58,11 +60,19 @@ Supported Document Types
 	Run: func(cmd *cobra.Command, args []string) {
 		// TODO: Work your own magic here
 		var username string
-		fmt.Scanf("%s", &username)
-		password, _ := speakeasy.Ask("Please enter your password: ")
+		fmt.Print("Username for 'https://guprint.gonzaga.edu': ")
+		fmt.Scanln(&username)
+		password, _ := speakeasy.Ask("Password for 'https://guprint.gonzaga.edu': ")
 
 		credentials := utils.CreatePaperCutCredentials(username, password)
-		fmt.Println(credentials.GetSessionID())
+
+		if !credentials.IsLoggedIn() {
+			fmt.Println("Could not connect to Gonzaga Print Services")
+			os.Exit(1)
+		}
+
+		utils.GetPaperCutPrinters(credentials)
+
 	},
 }
 
