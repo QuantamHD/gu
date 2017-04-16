@@ -45,6 +45,14 @@ type PaperCutPrintJob struct {
 	jobID            string
 }
 
+/**
+ * Converts to an array of strings for utility purposes
+ */
+func (p PaperCutPrinter) ToListStrings() []string {
+	data := []string{strconv.Itoa(p.value), p.name, p.location}
+	return data
+}
+
 func (p PaperCutCredentials) GetSessionID() string {
 	return p.sessionID
 }
