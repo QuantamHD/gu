@@ -12,6 +12,8 @@ import (
 
 	"strings"
 
+	"io"
+
 	"github.com/PuerkitoBio/goquery"
 )
 
@@ -67,6 +69,7 @@ func GetPaperCutPrinters(credentials *PaperCutCredentials) []*PaperCutPrinter {
 	req, _ := http.NewRequest("GET", printerListURL, nil)
 
 	addGetHeaders(req, credentials.sessionID)
+
 	resp, err := netClient.Do(req)
 
 	if err != nil {
@@ -79,32 +82,9 @@ func GetPaperCutPrinters(credentials *PaperCutCredentials) []*PaperCutPrinter {
 	return getPrinterList(resp)
 }
 
-func CreatePrintJob(printer *PaperCutPrinter, copies int, filePath string) {
+func CreatePrintJob(credentials *PaperCutCredentials, printer *PaperCutPrinter, copies int, filePath string) {
 	printJob := PaperCutPrintJob{printer, copies, filePath, -1, ""}
-
-}
-
-func getPrinterList(httpResponse *http.Response) []*PaperCutPrinter {
-	var printers []*PaperCutPrinter
-
-	doc, err := goquery.NewDocumentFromResponse(httpResponse)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	doc.Find(".odd, .even").Each(func(i int, s *goquery.Selection) {
-
-		printerName := strings.Replace(s.Find("label").Text(), "\n", "", -1)
-		locationName := strings.Replace(s.Find("td.locationColumnValue").Text(), "\n", "", -1)
-		valueString, _ := s.Find("input").Attr("value")
-		valueInt, _ := strconv.Atoi(valueString)
-
-		structPrinter := PaperCutPrinter{valueInt, printerName, locationName}
-
-		printers = append(printers, &structPrinter)
-	})
-
-	return printers
+	submitPrinterSelection(credentials, &printJob)
 }
 
 func intitalConnection() (string, *http.Client) {
@@ -160,6 +140,68 @@ func login(credentials *PaperCutCredentials) {
 		credentials.isLoggedIn = true
 		credentials.sessionID = jessionid
 	}
+}
+
+func getPrinterList(httpResponse *http.Response) []*PaperCutPrinter {
+	var printers []*PaperCutPrinter
+
+	doc, err := goquery.NewDocumentFromResponse(httpResponse)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	doc.Find(".odd, .even").Each(func(i int, s *goquery.Selection) {
+
+		printerName := strings.Replace(s.Find("label").Text(), "\n", "", -1)
+		locationName := strings.Replace(s.Find("td.locationColumnValue").Text(), "\n", "", -1)
+		valueString, _ := s.Find("input").Attr("value")
+		valueInt, _ := strconv.Atoi(valueString)
+
+		structPrinter := PaperCutPrinter{valueInt, printerName, locationName}
+
+		printers = append(printers, &structPrinter)
+	})
+
+	return printers
+}
+
+func submitPrinterSelection(credentials *PaperCutCredentials, printJob *PaperCutPrintJob) {
+	netClient := &http.Client{
+		Timeout: time.Second * 10,
+	}
+
+	submitPrinterURL := baseURL + "/app"
+
+	form := url.Values{
+		"service":     {"direct/1/UserWebPrintSelectPrinter/$Form"},
+		"sp":          {"S0"},
+		"Form0":       {"$Hidden,$Hidden$0,$TextField,$Submit,$RadioGroup,$Submit$0,$Submit$1"},
+		"$Hidden":     {""},
+		"$Hidden$0":   {""},
+		"$TextField":  {""},
+		"$RadioGroup": {strconv.Itoa(printJob.printer.value)},
+		"$Submit$1":   {"2. Print Options and Account Selection »"},
+	}
+
+	req, _ := http.NewRequest("POST", submitPrinterURL, bytes.NewBufferString(form.Encode()))
+
+	resp, err := netClient.Do(req)
+
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	defer resp.Body.Close()
+
+	io.Copy(os.Stdout, resp.Body)
+}
+
+func submitCopyAmount() {
+
+}
+
+func submitDocument() {
+
 }
 
 func addGetHeaders(req *http.Request, jsessionid string) {
