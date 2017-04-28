@@ -41,20 +41,31 @@ func printTable(printers []*utils.PaperCutPrinter) {
 
 /*
 Prompts user to select printer ID.
+Pass in number of printers.
 Returns ID, exits if not a valid int.
  */
-func selectPrinterID() string {
+func selectPrinterID(numPrinters int) int {
+
+	// If only one printer, return that printerID
+	if numPrinters == 1 {
+		return 0
+	}
+
 	var printerID string
 	fmt.Print("Select a printer ID: ")
 	fmt.Scanln(&printerID)
 
-	// check if printerID is an int
-	if _, err := strconv.Atoi(printerID); err != nil {
-    fmt.Println("Not a valid ID!")
+	// check if printerID is an int and in range
+	id, err := strconv.Atoi(printerID);
+	if err != nil {
+		fmt.Println("Not a valid ID!")
+		os.Exit(1)
+	} else if id >= numPrinters || id < 0 {
+		fmt.Println("Not a valid ID!")
 		os.Exit(1)
 	}
 
-	return printerID
+	return id
 }
 
 /*
@@ -130,9 +141,9 @@ Supported Document Types
 		credentials := login()
 		printers := utils.GetPaperCutPrinters(credentials)
 		printTable(printers)
-		printerID := selectPrinterID()
+		printerID := selectPrinterID(len(printers))
 
-		fmt.Println("Printing " + filePath + " to printer " + printerID)
+		fmt.Println("Printing " + filePath + " to printer " + strconv.Itoa(printerID))
 
 	},
 }
