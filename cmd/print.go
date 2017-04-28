@@ -163,9 +163,10 @@ Supported Document Types
 		printTable(printers)
 		printer := selectPrinter(printers)
 		copies := selectCopies()
+		utils.CreatePrintJob(credentials, &printer, copies, filePath)
 
 		fmt.Println("Printing " + strconv.Itoa(copies) + " copies of " +
-		 	filePath + " to printer " + printer.GetName())
+		 	filePath + " to printer " + printer.GetName() + ".")
 
 	},
 }

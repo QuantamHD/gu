@@ -72,7 +72,6 @@ func CreatePaperCutCredentials(username string, password string) *PaperCutCreden
 }
 
 func GetPaperCutPrinters(credentials *PaperCutCredentials) map[int]PaperCutPrinter {
-//func GetPaperCutPrinters(credentials *PaperCutCredentials) []*PaperCutPrinter {
 	netClient := &http.Client{
 		Timeout: time.Second * 10,
 	}
@@ -156,8 +155,6 @@ func login(credentials *PaperCutCredentials) {
 }
 
 func getPrinterList(httpResponse *http.Response) map[int]PaperCutPrinter {
-//func getPrinterList(httpResponse *http.Response) []*PaperCutPrinter {
-	//var printers []*PaperCutPrinter
 	var printers = map[int]PaperCutPrinter{}
 
 	doc, err := goquery.NewDocumentFromResponse(httpResponse)
@@ -174,7 +171,6 @@ func getPrinterList(httpResponse *http.Response) map[int]PaperCutPrinter {
 
 		structPrinter := PaperCutPrinter{valueInt, printerName, locationName}
 
-		//printers = append(printers, &structPrinter)
 		printers[valueInt] = structPrinter
 	})
 
