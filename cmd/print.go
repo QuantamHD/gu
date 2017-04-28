@@ -40,6 +40,26 @@ func printTable(printers []*utils.PaperCutPrinter) {
 }
 
 /*
+Prompts user to select number of copies.
+ */
+func selectCopies() int {
+	var copies string
+	fmt.Print("Number of copies: ")
+	fmt.Scanln(&copies)
+
+	// check if printerID is an int and in range
+	num, err := strconv.Atoi(copies);
+	if err != nil {
+		fmt.Println("Not a valid number of copies!")
+		os.Exit(1)
+	} else if num < 1 {
+		fmt.Println("Not a valid number of copies!")
+		os.Exit(1)
+	}
+	return num
+}
+
+/*
 Prompts user to select printer ID.
 Pass in number of printers.
 Returns ID, exits if not a valid int.
@@ -142,8 +162,10 @@ Supported Document Types
 		printers := utils.GetPaperCutPrinters(credentials)
 		printTable(printers)
 		printerID := selectPrinterID(len(printers))
+		copies := selectCopies()
 
-		fmt.Println("Printing " + filePath + " to printer " + strconv.Itoa(printerID))
+		fmt.Println("Printing " + strconv.Itoa(copies) + " copies of " +
+		 	filePath + " to printer " + strconv.Itoa(printerID))
 
 	},
 }
