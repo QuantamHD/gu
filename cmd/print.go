@@ -19,6 +19,8 @@ import (
 
 	"os"
 
+	"strconv"
+
 	"github.com/bgentry/speakeasy"
 	"github.com/quantamhd/gu/utils"
 	"github.com/spf13/cobra"
@@ -35,6 +37,57 @@ func printTable(printers []*utils.PaperCutPrinter) {
 	}
 
 	table.Render()
+}
+
+/*
+Prompts user to select printer ID.
+Returns ID, exits if not a valid int.
+ */
+func selectPrinterID() string {
+	var printerID string
+	fmt.Print("Select a printer ID: ")
+	fmt.Scanln(&printerID)
+
+	// check if printerID is an int
+	if _, err := strconv.Atoi(printerID); err != nil {
+    fmt.Println("Not a valid ID!")
+		os.Exit(1)
+	}
+
+	return printerID
+}
+
+/*
+Handles login with user. Exits if failed login.
+Returns credentials object.
+*/
+func login() *utils.PaperCutCredentials {
+	var username string
+	fmt.Print("Username for 'https://guprint.gonzaga.edu': ")
+	fmt.Scanln(&username)
+	password, _ := speakeasy.Ask("Password for 'https://guprint.gonzaga.edu': ")
+
+	credentials := utils.CreatePaperCutCredentials(username, password)
+
+	if !credentials.IsLoggedIn() {
+		fmt.Println("Could not connect to Gonzaga Print Services")
+		os.Exit(1)
+	}
+
+	return credentials
+}
+
+/*
+Extracts the filePath from command line args. Exits if no file path.
+ */
+func getFilePath() string {
+
+	if len(os.Args) < 3 {
+		fmt.Println("Need to specify a file to print!")
+		os.Exit(1)
+	}
+
+	return os.Args[2]
 }
 
 // printCmd represents the print command
@@ -72,20 +125,14 @@ Supported Document Types
 	`,
 	Run: func(cmd *cobra.Command, args []string) {
 		// TODO: Work your own magic here
-		var username string
-		fmt.Print("Username for 'https://guprint.gonzaga.edu': ")
-		fmt.Scanln(&username)
-		password, _ := speakeasy.Ask("Password for 'https://guprint.gonzaga.edu': ")
 
-		credentials := utils.CreatePaperCutCredentials(username, password)
-
-		if !credentials.IsLoggedIn() {
-			fmt.Println("Could not connect to Gonzaga Print Services")
-			os.Exit(1)
-		}
-
+		filePath := getFilePath()
+		credentials := login()
 		printers := utils.GetPaperCutPrinters(credentials)
 		printTable(printers)
+		printerID := selectPrinterID()
+
+		fmt.Println("Printing " + filePath + " to printer " + printerID)
 
 	},
 }
