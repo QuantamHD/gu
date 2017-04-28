@@ -27,7 +27,7 @@ import (
 	"github.com/olekukonko/tablewriter"
 )
 
-func printTable(printers []*utils.PaperCutPrinter) {
+func printTable(printers map[int]utils.PaperCutPrinter) {
 	table := tablewriter.NewWriter(os.Stdout)
 	table.SetHeader([]string{"ID", "name", "location"})
 	table.SetRowLine(true)
@@ -60,32 +60,32 @@ func selectCopies() int {
 }
 
 /*
-Prompts user to select printer ID.
-Pass in number of printers.
-Returns ID, exits if not a valid int.
+Prompts user to select printer.
+Pass in map of printers.
+Returns selected printer.
  */
-func selectPrinterID(numPrinters int) int {
+func selectPrinter(printers map[int]utils.PaperCutPrinter) utils.PaperCutPrinter {
 
-	// If only one printer, return that printerID
-	if numPrinters == 1 {
-		return 0
+	// If only one printer, return that printer
+	if len(printers) == 1 {
+		return printers[0]
 	}
 
 	var printerID string
 	fmt.Print("Select a printer ID: ")
 	fmt.Scanln(&printerID)
 
-	// check if printerID is an int and in range
+	// check if printerID is an int and a valid ID
 	id, err := strconv.Atoi(printerID);
 	if err != nil {
 		fmt.Println("Not a valid ID!")
 		os.Exit(1)
-	} else if id >= numPrinters || id < 0 {
+	} else if _, ok := printers[id]; !ok {
 		fmt.Println("Not a valid ID!")
 		os.Exit(1)
 	}
 
-	return id
+	return printers[id]
 }
 
 /*
@@ -161,11 +161,11 @@ Supported Document Types
 		credentials := login()
 		printers := utils.GetPaperCutPrinters(credentials)
 		printTable(printers)
-		printerID := selectPrinterID(len(printers))
+		printer := selectPrinter(printers)
 		copies := selectCopies()
 
 		fmt.Println("Printing " + strconv.Itoa(copies) + " copies of " +
-		 	filePath + " to printer " + strconv.Itoa(printerID))
+		 	filePath + " to printer " + printer.GetName())
 
 	},
 }
