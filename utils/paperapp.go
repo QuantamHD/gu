@@ -15,6 +15,7 @@ import (
 	"strings"
 
 	"io/ioutil"
+	"io"
 
 	"github.com/PuerkitoBio/goquery"
 )
@@ -104,6 +105,7 @@ func CreatePrintJob(credentials *PaperCutCredentials, printer *PaperCutPrinter, 
 	printJob := PaperCutPrintJob{printer, copies, filePath, -1, ""}
 	submitPrinterSelection(credentials, &printJob)
 	submitCopyAmount(credentials, &printJob)
+	submitDocument(credentials, &printJob)
 }
 
 func intitalConnection() (string, *http.Client) {
@@ -319,7 +321,7 @@ func submitDocument(credentials *PaperCutCredentials, printJob *PaperCutPrintJob
 		log.Fatal(err)
 		os.Exit(1)
 	}
-
+	io.Copy(os.Stdout, resp.Body)
 	resp.Body.Close()
 
 }
