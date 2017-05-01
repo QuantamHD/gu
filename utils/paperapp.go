@@ -6,6 +6,7 @@ import (
 	"log"
 	"mime/multipart"
 	"net/http"
+	"net/textproto"
 	"net/url"
 	"os"
 	"regexp"
@@ -288,7 +289,11 @@ func submitDocument(credentials *PaperCutCredentials, printJob *PaperCutPrintJob
 
 	body := new(bytes.Buffer)
 	writer := multipart.NewWriter(body)
-	part, err := writer.CreateFormFile("filename", fi.Name())
+	writer.SetBoundary("----WebKitFormBoundaryTy4GAUTgQRtwjfOn")
+	h := make(textproto.MIMEHeader)
+	h.Set("Content-Disposition", fmt.Sprintf(`form-data; name="%s"; filename="%s"`, "file[]", fi.Name()))
+	h.Set("Content-Type", "application/pdf")
+	part, err := writer.CreatePart(h)
 
 	if err != nil {
 		log.Fatal(err)
@@ -298,6 +303,8 @@ func submitDocument(credentials *PaperCutCredentials, printJob *PaperCutPrintJob
 	part.Write(fileContents)
 
 	err = writer.Close()
+
+	//io.Copy(os.Stdout, body)
 
 	if err != nil {
 		log.Fatal(err)
@@ -314,8 +321,9 @@ func submitDocument(credentials *PaperCutCredentials, printJob *PaperCutPrintJob
 		log.Fatal(err)
 		os.Exit(1)
 	}
+	addUploadHeaders(req, body, credentials.sessionID)
 
-	addUploadHeaders(req, credentials.sessionID)
+	println(strconv.Itoa(printJob.uploadID))
 
 	resp, err := netClient.Do(req)
 
@@ -358,13 +366,14 @@ func addPostHeaders(req *http.Request, form url.Values, jessionid string) {
 
 }
 
-func addUploadHeaders(req *http.Request, jessionid string) {
+func addUploadHeaders(req *http.Request, body *bytes.Buffer, jessionid string) {
 	req.Header.Add("Accept", "application/json")
 	req.Header.Add("Accept-Encoding", "")
 	req.Header.Add("Accept-Language", "en-US,en;q=0.8")
 	req.Header.Add("Cache-Control", "no-cache")
 	req.Header.Add("Connection", "keep-alive")
 	req.Header.Add("Cookie", "JSESSIONID="+jessionid)
+	req.Header.Add("Content-Length", "18913")
 	req.Header.Add("Host", "paper-app.gonzaga.edu:9192")
 	req.Header.Add("Origin", "https://paper-app.gonzaga.edu:9192")
 	req.Header.Add("Referer", "https://paper-app.gonzaga.edu:9192/app")
