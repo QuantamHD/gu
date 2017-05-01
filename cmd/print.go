@@ -26,7 +26,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func printTable(printers []*utils.PaperCutPrinter) {
+func printTable(printers map[int]utils.PaperCutPrinter) {
 	table := tablewriter.NewWriter(os.Stdout)
 	table.SetHeader([]string{"ID", "name", "location"})
 	table.SetRowLine(true)
@@ -38,34 +38,86 @@ func printTable(printers []*utils.PaperCutPrinter) {
 	table.Render()
 }
 
-func selectPrinter(printers []*utils.PaperCutPrinter) *utils.PaperCutPrinter {
-	var id string
-	fmt.Print("Select Printer id(i.e. 1,2 or 4, ...): ")
-	fmt.Scanln(&id)
+/*
+Prompts user to select number of copies.
+*/
+func selectCopies() int {
+	var copies string
+	fmt.Print("Number of copies: ")
+	fmt.Scanln(&copies)
 
-	idInt, err := strconv.Atoi(id)
-
+	// check if printerID is an int and in range
+	num, err := strconv.Atoi(copies)
 	if err != nil {
-		fmt.Println("Please input an integer.")
-		return selectPrinter(printers)
+		fmt.Println("Not a valid number of copies!")
+		os.Exit(1)
+	} else if num < 1 {
+		fmt.Println("Not a valid number of copies!")
+		os.Exit(1)
+	}
+	return num
+}
+
+/*
+Prompts user to select printer.
+Pass in map of printers.
+Returns selected printer.
+*/
+func selectPrinter(printers map[int]utils.PaperCutPrinter) utils.PaperCutPrinter {
+
+	// If only one printer, return that printer
+	if len(printers) == 1 {
+		return printers[0]
 	}
 
-	var idExists bool
-	var selectedPrinter *utils.PaperCutPrinter
+	var printerID string
+	fmt.Print("Select a printer ID: ")
+	fmt.Scanln(&printerID)
 
-	for _, p := range printers {
-		if p.GetID() == idInt {
-			idExists = true
-			selectedPrinter = p
-		}
+	// check if printerID is an int and a valid ID
+	id, err := strconv.Atoi(printerID)
+	if err != nil {
+		fmt.Println("Not a valid ID!")
+		os.Exit(1)
+	} else if _, ok := printers[id]; !ok {
+		fmt.Println("Not a valid ID!")
+		os.Exit(1)
 	}
 
-	if !idExists {
-		fmt.Println("That id is not in the system.")
-		return selectPrinter(printers)
+	return printers[id]
+}
+
+/*
+Handles login with user. Exits if failed login.
+Returns credentials object.
+*/
+func login() *utils.PaperCutCredentials {
+	var username string
+	fmt.Print("Username for 'https://guprint.gonzaga.edu': ")
+	fmt.Scanln(&username)
+	password, _ := speakeasy.Ask("Password for 'https://guprint.gonzaga.edu': ")
+
+	credentials := utils.CreatePaperCutCredentials(username, password)
+
+	if !credentials.IsLoggedIn() {
+		fmt.Println("Could not connect to Gonzaga Print Services")
+		os.Exit(1)
 	}
 
-	return selectedPrinter
+	return credentials
+}
+
+/*
+Extracts the filePath from command line args. Exits if no file path.
+*/
+func getFilePath() string {
+
+	if len(os.Args) < 3 {
+		fmt.Println("Need to specify a file to print!")
+		os.Exit(1)
+	}
+
+	return os.Args[2]
 }
 
 // printCmd represents the print command
@@ -103,22 +155,18 @@ Supported Document Types
 	`,
 	Run: func(cmd *cobra.Command, args []string) {
 		// TODO: Work your own magic here
-		var username string
-		fmt.Print("Username for 'https://guprint.gonzaga.edu': ")
-		fmt.Scanln(&username)
-		password, _ := speakeasy.Ask("Password for 'https://guprint.gonzaga.edu': ")
 
-		credentials := utils.CreatePaperCutCredentials(username, password)
-
-		if !credentials.IsLoggedIn() {
-			fmt.Println("Could not connect to Gonzaga Print Services")
-			os.Exit(1)
-		}
-
+		filePath := getFilePath()
+		credentials := login()
 		printers := utils.GetPaperCutPrinters(credentials)
 		printTable(printers)
-		selectedPrinter := selectPrinter(printers)
-		utils.CreatePrintJob(credentials, selectedPrinter, 1, "")
+		printer := selectPrinter(printers)
+		copies := selectCopies()
+		utils.CreatePrintJob(credentials, &printer, copies, filePath)
+
+		fmt.Println("Printing " + strconv.Itoa(copies) + " copies of " +
+			filePath + " to printer " + printer.GetName() + ".")
+
 	},
 }
 

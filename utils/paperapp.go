@@ -47,6 +47,10 @@ type PaperCutPrintJob struct {
 	jobID            string
 }
 
+func (p PaperCutPrinter) GetName() string {
+	return p.name
+}
+
 /**
  * Converts to an array of strings for utility purposes
  */
@@ -73,7 +77,7 @@ func CreatePaperCutCredentials(username string, password string) *PaperCutCreden
 	return &credentials
 }
 
-func GetPaperCutPrinters(credentials *PaperCutCredentials) []*PaperCutPrinter {
+func GetPaperCutPrinters(credentials *PaperCutCredentials) map[int]PaperCutPrinter {
 	netClient := &http.Client{
 		Timeout: time.Second * 10,
 	}
@@ -157,8 +161,8 @@ func login(credentials *PaperCutCredentials) {
 	}
 }
 
-func getPrinterList(httpResponse *http.Response) []*PaperCutPrinter {
-	var printers []*PaperCutPrinter
+func getPrinterList(httpResponse *http.Response) map[int]PaperCutPrinter {
+	var printers = map[int]PaperCutPrinter{}
 
 	doc, err := goquery.NewDocumentFromResponse(httpResponse)
 	if err != nil {
@@ -174,7 +178,7 @@ func getPrinterList(httpResponse *http.Response) []*PaperCutPrinter {
 
 		structPrinter := PaperCutPrinter{valueInt, printerName, locationName}
 
-		printers = append(printers, &structPrinter)
+		printers[valueInt] = structPrinter
 	})
 
 	return printers
@@ -199,6 +203,8 @@ func submitPrinterSelection(credentials *PaperCutCredentials, printJob *PaperCut
 	}
 
 	req, _ := http.NewRequest("POST", submitPrinterURL, bytes.NewBufferString(form.Encode()))
+	addPostHeaders(req, form, credentials.sessionID)
+
 	addPostHeaders(req, form, credentials.sessionID)
 
 	resp, err := netClient.Do(req)
