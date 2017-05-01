@@ -197,6 +197,8 @@ func submitPrinterSelection(credentials *PaperCutCredentials, printJob *PaperCut
 
 	req, _ := http.NewRequest("POST", submitPrinterURL, bytes.NewBufferString(form.Encode()))
 
+	addPostHeaders(req, form, credentials.sessionID)
+
 	resp, err := netClient.Do(req)
 
 	if err != nil {
