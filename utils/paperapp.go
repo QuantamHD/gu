@@ -4,15 +4,17 @@ import (
 	"bytes"
 	"fmt"
 	"log"
+	"mime/multipart"
 	"net/http"
 	"net/url"
 	"os"
+	"regexp"
 	"strconv"
 	"time"
 
 	"strings"
 
-	"io"
+	"io/ioutil"
 
 	"github.com/PuerkitoBio/goquery"
 )
@@ -51,6 +53,10 @@ type PaperCutPrintJob struct {
 func (p PaperCutPrinter) ToListStrings() []string {
 	data := []string{strconv.Itoa(p.value), p.name, p.location}
 	return data
+}
+
+func (p PaperCutPrinter) GetID() int {
+	return p.value
 }
 
 func (p PaperCutCredentials) GetSessionID() string {
@@ -93,6 +99,7 @@ func GetPaperCutPrinters(credentials *PaperCutCredentials) []*PaperCutPrinter {
 func CreatePrintJob(credentials *PaperCutCredentials, printer *PaperCutPrinter, copies int, filePath string) {
 	printJob := PaperCutPrintJob{printer, copies, filePath, -1, ""}
 	submitPrinterSelection(credentials, &printJob)
+	submitCopyAmount(credentials, &printJob)
 }
 
 func intitalConnection() (string, *http.Client) {
@@ -192,6 +199,36 @@ func submitPrinterSelection(credentials *PaperCutCredentials, printJob *PaperCut
 	}
 
 	req, _ := http.NewRequest("POST", submitPrinterURL, bytes.NewBufferString(form.Encode()))
+	addPostHeaders(req, form, credentials.sessionID)
+
+	resp, err := netClient.Do(req)
+
+	if err != nil {
+		log.Fatal(err)
+		os.Exit(1)
+	}
+
+	defer resp.Body.Close()
+
+}
+
+func submitCopyAmount(credentials *PaperCutCredentials, printJob *PaperCutPrintJob) {
+	netClient := &http.Client{
+		Timeout: time.Second * 10,
+	}
+
+	submitPrinterURL := baseURL + "/app"
+
+	form := url.Values{
+		"service": {"direct/1/UserWebPrintOptionsAndAccountSelection/$Form"},
+		"sp":      {"S0"},
+		"Form0":   {"copies,$Submit,$Submit$0"},
+		"copies":  {strconv.Itoa(printJob.copies)},
+		"$Submit": {"3. Upload Documents »"},
+	}
+
+	req, _ := http.NewRequest("POST", submitPrinterURL, bytes.NewBufferString(form.Encode()))
+	addPostHeadersReferer(req, form, credentials.sessionID, "app")
 
 	resp, err := netClient.Do(req)
 
@@ -201,14 +238,83 @@ func submitPrinterSelection(credentials *PaperCutCredentials, printJob *PaperCut
 
 	defer resp.Body.Close()
 
-	io.Copy(os.Stdout, resp.Body)
+	buf := new(bytes.Buffer)
+	buf.ReadFrom(resp.Body)
+	html := buf.String()
+
+	re, err := regexp.Compile(`var uploadUID = '([0-9]*)'`) // want to know what is in front of 'at'
+	res := re.FindAllStringSubmatch(html, -1)
+	uploadID, err := strconv.Atoi(res[0][1])
+
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	printJob.uploadID = uploadID
 }
 
-func submitCopyAmount() {
+func submitDocument(credentials *PaperCutCredentials, printJob *PaperCutPrintJob) {
+	netClient := &http.Client{
+		Timeout: time.Second * 10,
+	}
 
-}
+	file, err := os.Open(printJob.fileLocationPath)
+	if err != nil {
+		log.Fatal(err)
+		os.Exit(1)
+	}
 
-func submitDocument() {
+	fileContents, err := ioutil.ReadAll(file)
+	if err != nil {
+		log.Fatal(err)
+		os.Exit(1)
+	}
+
+	fi, err := file.Stat()
+	if err != nil {
+		log.Fatal(err)
+		os.Exit(1)
+	}
+
+	file.Close()
+
+	body := new(bytes.Buffer)
+	writer := multipart.NewWriter(body)
+	part, err := writer.CreateFormFile("file[]", fi.Name())
+
+	if err != nil {
+		log.Fatal(err)
+		os.Exit(1)
+	}
+
+	part.Write(fileContents)
+
+	err = writer.Close()
+
+	if err != nil {
+		log.Fatal(err)
+		os.Exit(1)
+	}
+
+	uploadURL := baseURL + "/upload/" + strconv.Itoa(printJob.uploadID)
+
+	req, err := http.NewRequest("POST", uploadURL, body)
+
+	if err != nil {
+		log.Fatal(err)
+		os.Exit(1)
+	}
+
+	addUploadHeaders(req, credentials.sessionID)
+
+	resp, err := netClient.Do(req)
+
+	if err != nil {
+		log.Fatal(err)
+		os.Exit(1)
+	}
+
+	resp.Body.Close()
 
 }
 
@@ -235,6 +341,37 @@ func addPostHeaders(req *http.Request, form url.Values, jessionid string) {
 	req.Header.Add("Host", "paper-app.gonzaga.edu:9192")
 	req.Header.Add("Origin", "https://paper-app.gonzaga.edu:9192")
 	req.Header.Add("Referer", "https://paper-app.gonzaga.edu:9192/user")
+	req.Header.Add("User-Agent", "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/57.0.2987.133 Safari/537.36")
+
+}
+
+func addUploadHeaders(req *http.Request, jessionid string) {
+	req.Header.Add("Accept", "application/json")
+	req.Header.Add("Accept-Encoding", "")
+	req.Header.Add("Accept-Language", "en-US,en;q=0.8")
+	req.Header.Add("Cache-Control", "no-cache")
+	req.Header.Add("Connection", "keep-alive")
+	req.Header.Add("Cookie", "JSESSIONID="+jessionid)
+	req.Header.Add("Host", "paper-app.gonzaga.edu:9192")
+	req.Header.Add("Origin", "https://paper-app.gonzaga.edu:9192")
+	req.Header.Add("Referer", "https://paper-app.gonzaga.edu:9192/app")
+	req.Header.Add("User-Agent", "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/57.0.2987.133 Safari/537.36")
+	req.Header.Add("X-Requested-With", "XMLHttpRequest")
+
+}
+
+func addPostHeadersReferer(req *http.Request, form url.Values, jessionid string, referer string) {
+	req.Header.Add("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8")
+	req.Header.Add("Accept-Encoding", "")
+	req.Header.Add("Accept-Language", "en-US,en;q=0.8")
+	req.Header.Add("Cache-Control", "max-age=0")
+	req.Header.Add("Connection", "keep-alive")
+	req.Header.Add("Content-Length", strconv.Itoa(len(form.Encode())))
+	req.Header.Add("Cookie", "org.apache.tapestry.locale=en;JSESSIONID="+jessionid)
+	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Add("Host", "paper-app.gonzaga.edu:9192")
+	req.Header.Add("Origin", "https://paper-app.gonzaga.edu:9192")
+	req.Header.Add("Referer", "https://paper-app.gonzaga.edu:9192/"+referer)
 	req.Header.Add("User-Agent", "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/57.0.2987.133 Safari/537.36")
 
 }

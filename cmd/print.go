@@ -18,11 +18,12 @@ import (
 	"fmt"
 
 	"os"
+	"strconv"
 
 	"github.com/bgentry/speakeasy"
+	"github.com/olekukonko/tablewriter"
 	"github.com/quantamhd/gu/utils"
 	"github.com/spf13/cobra"
-	"github.com/olekukonko/tablewriter"
 )
 
 func printTable(printers []*utils.PaperCutPrinter) {
@@ -35,6 +36,36 @@ func printTable(printers []*utils.PaperCutPrinter) {
 	}
 
 	table.Render()
+}
+
+func selectPrinter(printers []*utils.PaperCutPrinter) *utils.PaperCutPrinter {
+	var id string
+	fmt.Print("Select Printer id(i.e. 1,2 or 4, ...): ")
+	fmt.Scanln(&id)
+
+	idInt, err := strconv.Atoi(id)
+
+	if err != nil {
+		fmt.Println("Please input an integer.")
+		return selectPrinter(printers)
+	}
+
+	var idExists bool
+	var selectedPrinter *utils.PaperCutPrinter
+
+	for _, p := range printers {
+		if p.GetID() == idInt {
+			idExists = true
+			selectedPrinter = p
+		}
+	}
+
+	if !idExists {
+		fmt.Println("That id is not in the system.")
+		return selectPrinter(printers)
+	}
+
+	return selectedPrinter
 }
 
 // printCmd represents the print command
@@ -86,7 +117,8 @@ Supported Document Types
 
 		printers := utils.GetPaperCutPrinters(credentials)
 		printTable(printers)
-
+		selectedPrinter := selectPrinter(printers)
+		utils.CreatePrintJob(credentials, selectedPrinter, 1, "")
 	},
 }
 
