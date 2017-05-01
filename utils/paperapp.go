@@ -14,8 +14,8 @@ import (
 
 	"strings"
 
-	"io/ioutil"
 	"io"
+	"io/ioutil"
 
 	"github.com/PuerkitoBio/goquery"
 )
@@ -288,7 +288,7 @@ func submitDocument(credentials *PaperCutCredentials, printJob *PaperCutPrintJob
 
 	body := new(bytes.Buffer)
 	writer := multipart.NewWriter(body)
-	part, err := writer.CreateFormFile("file[]", fi.Name())
+	part, err := writer.CreateFormFile("filename", fi.Name())
 
 	if err != nil {
 		log.Fatal(err)
@@ -308,6 +308,8 @@ func submitDocument(credentials *PaperCutCredentials, printJob *PaperCutPrintJob
 
 	req, err := http.NewRequest("POST", uploadURL, body)
 
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+
 	if err != nil {
 		log.Fatal(err)
 		os.Exit(1)
@@ -321,9 +323,12 @@ func submitDocument(credentials *PaperCutCredentials, printJob *PaperCutPrintJob
 		log.Fatal(err)
 		os.Exit(1)
 	}
-	io.Copy(os.Stdout, resp.Body)
-	resp.Body.Close()
 
+	io.Copy(os.Stdout, resp.Body)
+
+	println("Test")
+
+	defer resp.Body.Close()
 }
 
 func addGetHeaders(req *http.Request, jsessionid string) {
